@@ -79,6 +79,30 @@ public class Receivable implements Serializable {
     @Column(length = 64)
     private String buyerReceiptOperator;
 
+    @Column(precision = 18, scale = 2)
+    private BigDecimal buyerReceiptAmount;
+
+    private Boolean tradeBackgroundVerified;
+
+    @Column(length = 512)
+    private String tradeBackgroundRemark;
+
+    private Boolean pledged;
+
+    @Column(length = 512)
+    private String pledgedRemark;
+
+    @Column(length = 256)
+    private String repaymentAccount;
+
+    @Column(length = 512)
+    private String supplementRemark;
+
+    private Boolean auditCorrectionFlag;
+
+    @Column(length = 512)
+    private String auditCorrectionRemark;
+
     @Column(length = 64)
     private String fundUsername;
 
@@ -100,6 +124,9 @@ public class Receivable implements Serializable {
     public void prePersist() {
         if (status == null) status = ReceivableStatusEnum.DRAFT;
         if (buyerReceipt == null) buyerReceipt = false;
+        if (tradeBackgroundVerified == null) tradeBackgroundVerified = false;
+        if (pledged == null) pledged = false;
+        if (auditCorrectionFlag == null) auditCorrectionFlag = false;
         createTime = LocalDateTime.now();
         updateTime = LocalDateTime.now();
     }
@@ -157,6 +184,24 @@ public class Receivable implements Serializable {
     public void setBuyerReceiptTime(LocalDateTime buyerReceiptTime) { this.buyerReceiptTime = buyerReceiptTime; }
     public String getBuyerReceiptOperator() { return buyerReceiptOperator; }
     public void setBuyerReceiptOperator(String buyerReceiptOperator) { this.buyerReceiptOperator = buyerReceiptOperator; }
+    public BigDecimal getBuyerReceiptAmount() { return buyerReceiptAmount; }
+    public void setBuyerReceiptAmount(BigDecimal buyerReceiptAmount) { this.buyerReceiptAmount = buyerReceiptAmount; }
+    public Boolean getTradeBackgroundVerified() { return tradeBackgroundVerified; }
+    public void setTradeBackgroundVerified(Boolean tradeBackgroundVerified) { this.tradeBackgroundVerified = tradeBackgroundVerified; }
+    public String getTradeBackgroundRemark() { return tradeBackgroundRemark; }
+    public void setTradeBackgroundRemark(String tradeBackgroundRemark) { this.tradeBackgroundRemark = tradeBackgroundRemark; }
+    public Boolean getPledged() { return pledged; }
+    public void setPledged(Boolean pledged) { this.pledged = pledged; }
+    public String getPledgedRemark() { return pledgedRemark; }
+    public void setPledgedRemark(String pledgedRemark) { this.pledgedRemark = pledgedRemark; }
+    public String getRepaymentAccount() { return repaymentAccount; }
+    public void setRepaymentAccount(String repaymentAccount) { this.repaymentAccount = repaymentAccount; }
+    public String getSupplementRemark() { return supplementRemark; }
+    public void setSupplementRemark(String supplementRemark) { this.supplementRemark = supplementRemark; }
+    public Boolean getAuditCorrectionFlag() { return auditCorrectionFlag; }
+    public void setAuditCorrectionFlag(Boolean auditCorrectionFlag) { this.auditCorrectionFlag = auditCorrectionFlag; }
+    public String getAuditCorrectionRemark() { return auditCorrectionRemark; }
+    public void setAuditCorrectionRemark(String auditCorrectionRemark) { this.auditCorrectionRemark = auditCorrectionRemark; }
     public String getFundUsername() { return fundUsername; }
     public void setFundUsername(String fundUsername) { this.fundUsername = fundUsername; }
     public String getFundName() { return fundName; }

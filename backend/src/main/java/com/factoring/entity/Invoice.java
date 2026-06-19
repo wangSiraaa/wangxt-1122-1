@@ -58,6 +58,9 @@ public class Invoice implements Serializable {
     @Column(length = 64)
     private String verifyOperator;
 
+    @Column(precision = 18, scale = 2)
+    private BigDecimal transferredAmount;
+
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 
@@ -105,6 +108,8 @@ public class Invoice implements Serializable {
     public void setVerifyTime(LocalDateTime verifyTime) { this.verifyTime = verifyTime; }
     public String getVerifyOperator() { return verifyOperator; }
     public void setVerifyOperator(String verifyOperator) { this.verifyOperator = verifyOperator; }
+    public BigDecimal getTransferredAmount() { return transferredAmount; }
+    public void setTransferredAmount(BigDecimal transferredAmount) { this.transferredAmount = transferredAmount; }
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
     public LocalDateTime getUpdateTime() { return updateTime; }

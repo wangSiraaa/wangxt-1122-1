@@ -6,6 +6,7 @@ public enum ReceivableStatusEnum {
     VERIFY_PASSED("VERIFY_PASSED", "核验通过"),
     VERIFY_REJECTED("VERIFY_REJECTED", "核验驳回"),
     BUYER_CONFIRMED("BUYER_CONFIRMED", "买方已回执"),
+    PENDING_SUPPLEMENT("PENDING_SUPPLEMENT", "待补充材料"),
     PENDING_LOAN("PENDING_LOAN", "待放款"),
     LOANED("LOANED", "已放款"),
     REJECTED("REJECTED", "已驳回");

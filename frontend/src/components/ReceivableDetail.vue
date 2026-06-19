@@ -17,6 +17,34 @@
         <el-descriptions-item label="转让金额"><span style="color:#059669;font-weight:600;">¥ {{ formatMoney(data.transferAmount) }}</span></el-descriptions-item>
         <el-descriptions-item label="到期日">{{ data.dueDate || '-' }}</el-descriptions-item>
         <el-descriptions-item label="放款金额"><span v-if="data.loanAmount" style="color:#059669;font-weight:600;">¥ {{ formatMoney(data.loanAmount) }}</span><span v-else>-</span></el-descriptions-item>
+        <el-descriptions-item label="回款账户" :span="2" :class="{'is-locked': data.status === 'LOANED'}">
+          {{ data.repaymentAccount || '<span style="color:#ef4444;">未设置</span>' }}
+          <el-tag v-if="data.status === 'LOANED'" type="danger" size="small" style="margin-left:8px;">🔒 已放款，不可修改</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="买方回执金额">
+          <span v-if="data.buyerReceiptAmount !== null && data.buyerReceiptAmount !== undefined" :style="{color: data.buyerReceiptAmount >= data.transferAmount ? '#10b981' : '#f97316', fontWeight: 600}">
+            ¥ {{ formatMoney(data.buyerReceiptAmount) }}
+            <el-tag v-if="data.buyerReceiptAmount < data.transferAmount" type="warning" size="small" style="margin-left:6px;">差额</el-tag>
+          </span>
+          <span v-else>-</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="贸易背景核验">
+          <el-tag v-if="data.tradeBackgroundVerified" type="success">✅ 已核验</el-tag>
+          <el-tag v-else type="danger">❌ 未核验</el-tag>
+          <span v-if="data.tradeBackgroundRemark" style="color:#6b7280;margin-left:8px;font-size:12px;">{{ data.tradeBackgroundRemark }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="质押状态">
+          <el-tag v-if="data.pledged" type="danger">❌ 已质押（禁止放款）</el-tag>
+          <el-tag v-else type="success">✅ 未质押</el-tag>
+          <span v-if="data.pledgedRemark" style="color:#ef4444;margin-left:8px;font-size:12px;">{{ data.pledgedRemark }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item v-if="data.supplementRemark" label="补充材料说明" :span="2">
+          <div style="padding:8px 12px;background:#fff7ed;border-radius:6px;color:#c2410c;">{{ data.supplementRemark }}</div>
+        </el-descriptions-item>
+        <el-descriptions-item v-if="data.auditCorrectionFlag" label="审计更正标记" :span="2">
+          <el-tag type="warning">🔍 已更正</el-tag>
+          <span style="color:#d97706;margin-left:8px;">更正原因：{{ data.auditCorrectionRemark || '-' }}</span>
+        </el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{ data.remark || '-' }}</el-descriptions-item>
       </el-descriptions>
 
@@ -24,7 +52,12 @@
         <el-tab-pane label="📄 发票信息" name="inv">
           <el-table :data="invoices" size="small" border>
             <el-table-column prop="invoiceCode" label="发票代码" width="140" />
-            <el-table-column prop="invoiceNo" label="发票号码" width="120" />
+            <el-table-column prop="invoiceNo" label="发票号码" width="120">
+              <template #default="{row}">
+                {{ row.invoiceNo }}
+                <el-tag v-if="data.status === 'LOANED'" type="danger" size="small" style="margin-left:4px;">🔒</el-tag>
+              </template>
+            </el-table-column>
             <el-table-column prop="invoiceDate" label="开票日期" width="110" />
             <el-table-column label="金额" width="130">
               <template #default="{row}">¥ {{ formatMoney(row.amount) }}</template>
@@ -34,6 +67,17 @@
             </el-table-column>
             <el-table-column label="价税合计" width="140">
               <template #default="{row}"><b>¥ {{ formatMoney(row.totalAmount) }}</b></template>
+            </el-table-column>
+            <el-table-column label="已转让金额" width="130">
+              <template #default="{row}">
+                <span v-if="row.transferredAmount !== null && row.transferredAmount !== undefined" :style="{color: row.transferredAmount > 0 ? '#f97316' : '#10b981'}">
+                  ¥ {{ formatMoney(row.transferredAmount) }}
+                </span>
+                <span v-else>-</span>
+                <div v-if="row.transferredAmount !== null && row.transferredAmount !== undefined && row.transferredAmount > 0" style="font-size:11px;color:#6b7280;">
+                  剩余：¥{{ formatMoney(row.totalAmount - row.transferredAmount) }}
+                </div>
+              </template>
             </el-table-column>
             <el-table-column label="验真状态" width="110">
               <template #default="{row}">
@@ -140,13 +184,13 @@ const activeTab = ref('inv')
 const invoices = ref([])
 const logs = ref([])
 
-const editable = computed(() => props.data && ['DRAFT', 'VERIFY_REJECTED', 'REJECTED'].includes(props.data.status))
+const editable = computed(() => props.data && ['DRAFT', 'VERIFY_REJECTED', 'REJECTED', 'PENDING_SUPPLEMENT'].includes(props.data.status))
 
 const timelineType = (op) => {
   if (op?.includes('放款')) return 'success'
-  if (op?.includes('通过') || op?.includes('确认') || op?.includes('验真通过')) return 'success'
-  if (op?.includes('驳回')) return 'danger'
-  if (op?.includes('提交') || op?.includes('流转') || op?.includes('登记')) return 'warning'
+  if (op?.includes('通过') || op?.includes('确认') || op?.includes('验真通过') || op?.includes('核验')) return 'success'
+  if (op?.includes('驳回') || op?.includes('质押')) return 'danger'
+  if (op?.includes('提交') || op?.includes('流转') || op?.includes('登记') || op?.includes('补充材料') || op?.includes('审计更正')) return 'warning'
   return 'primary'
 }
 

@@ -4,6 +4,7 @@ export const statusMap = {
   VERIFY_PASSED: { label: '核验通过', color: 'success' },
   VERIFY_REJECTED: { label: '核验驳回', color: 'danger' },
   BUYER_CONFIRMED: { label: '买方已回执', color: 'primary' },
+  PENDING_SUPPLEMENT: { label: '待补充材料', color: 'warning' },
   PENDING_LOAN: { label: '待放款', color: 'warning' },
   LOANED: { label: '已放款', color: 'success' },
   REJECTED: { label: '已驳回', color: 'danger' }

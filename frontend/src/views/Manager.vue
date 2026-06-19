@@ -1,9 +1,10 @@
 <template>
   <AppLayout>
     <div class="page-container">
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;">
         <el-card shadow="hover"><div style="font-size:12px;color:#6b7280;">我的单据</div><div style="font-size:24px;font-weight:700;margin-top:6px;">{{ list.length }}</div></el-card>
         <el-card shadow="hover"><div style="font-size:12px;color:#6b7280;">草稿待完善</div><div style="font-size:24px;font-weight:700;margin-top:6px;color:#6366f1;">{{ countBy('DRAFT') + countBy('VERIFY_REJECTED') + countBy('REJECTED') }}</div></el-card>
+        <el-card shadow="hover"><div style="font-size:12px;color:#6b7280;">待补充材料</div><div style="font-size:24px;font-weight:700;margin-top:6px;color:#f97316;">{{ countBy('PENDING_SUPPLEMENT') }}</div></el-card>
         <el-card shadow="hover"><div style="font-size:12px;color:#6b7280;">审批中</div><div style="font-size:24px;font-weight:700;margin-top:6px;color:#f59e0b;">{{ countBy('PENDING_VERIFY') + countBy('VERIFY_PASSED') + countBy('BUYER_CONFIRMED') + countBy('PENDING_LOAN') }}</div></el-card>
         <el-card shadow="hover"><div style="font-size:12px;color:#6b7280;">已放款金额</div><div style="font-size:22px;font-weight:700;margin-top:6px;color:#10b981;">¥ {{ formatMoney(loanedAmount) }}</div></el-card>
       </div>
@@ -41,11 +42,13 @@
         <el-table-column prop="createTime" label="创建时间" width="160">
           <template #default="{row}">{{ formatDate(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right" align="center">
+        <el-table-column label="操作" width="360" fixed="right" align="center">
           <template #default="{row}">
             <el-button size="small" link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="['DRAFT','VERIFY_REJECTED','REJECTED'].includes(row.status)" size="small" link type="warning" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="['DRAFT','VERIFY_REJECTED','REJECTED'].includes(row.status)" size="small" link type="success" @click="submitRow(row)">提交风控</el-button>
+            <el-button v-if="['DRAFT','VERIFY_REJECTED','REJECTED','PENDING_SUPPLEMENT'].includes(row.status)" size="small" link type="warning" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="['DRAFT','VERIFY_REJECTED','REJECTED','PENDING_SUPPLEMENT'].includes(row.status)" size="small" link type="success" @click="submitRow(row)">提交风控</el-button>
+            <el-button v-if="row.status === 'PENDING_SUPPLEMENT'" size="small" link type="primary" @click="openSupplement(row)">补充材料</el-button>
+            <el-button v-if="row.status === 'LOANED'" size="small" link type="danger" @click="openAuditCorrection(row)">审计更正</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -76,6 +79,9 @@
             <el-col :span="8"><el-form-item label="转让比例">
               <el-input disabled :value="form.totalAmount && form.transferAmount ? ((form.transferAmount / form.totalAmount) * 100).toFixed(2) + '%' : '-'" />
             </el-form-item></el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="24"><el-form-item label="回款账户"><el-input v-model="form.repaymentAccount" placeholder="请填写融资方回款账户信息，如：招商银行北京分行 6226****1234" /></el-form-item></el-col>
           </el-row>
           <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="2" /></el-form-item>
 
@@ -115,6 +121,42 @@
           <el-button type="primary" @click="saveForm">保存</el-button>
         </template>
       </el-dialog>
+
+      <el-dialog v-model="supplementVisible" title="补充材料" width="560px" top="12vh">
+        <el-alert type="warning" show-icon :closable="false" style="margin-bottom:16px;">
+          <template #title>系统提示：买方回执金额与转让金额存在差异</template>
+          <div style="font-size:12px;margin-top:4px;color:#f97316;">{{ current?.supplementRemark || '请补充差额说明材料或调整转让金额' }}</div>
+        </el-alert>
+        <el-form label-width="100px">
+          <el-form-item label="应收账款编号"><el-input :value="current?.receivableNo" disabled /></el-form-item>
+          <el-form-item label="转让金额"><el-input :value="'¥ ' + formatMoney(current?.transferAmount)" disabled /></el-form-item>
+          <el-form-item label="补充说明" required><el-input v-model="supplementRemark" type="textarea" :rows="4" placeholder="请详细说明差额原因、补充的材料清单等" /></el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="supplementVisible = false">取消</el-button>
+          <el-button type="primary" @click="doSupplement">提交补充材料</el-button>
+        </template>
+      </el-dialog>
+
+      <el-dialog v-model="auditCorrectionVisible" title="审计更正申请" width="560px" top="12vh">
+        <el-alert type="error" show-icon :closable="false" style="margin-bottom:16px;">
+          <template #title>重要提示：已放款单据关键字段修改</template>
+          <div style="font-size:12px;margin-top:4px;">修改债务人、发票、回款账户等敏感信息，需进入审计更正流程，所有修改将永久留痕。</div>
+        </el-alert>
+        <el-form label-width="110px">
+          <el-form-item label="应收账款编号"><el-input :value="current?.receivableNo" disabled /></el-form-item>
+          <el-form-item label="更正原因" required><el-input v-model="auditCorrectionForm.auditRemark" type="textarea" :rows="2" placeholder="请详细说明更正原因" /></el-form-item>
+          <el-form-item label="修改内容"><div style="font-size:12px;color:#6b7280;">请在下方修改需要更正的字段，留空表示不修改</div></el-form-item>
+          <el-form-item label="债务人名称"><el-input v-model="auditCorrectionForm.debtorName" placeholder="输入新的债务人名称" /></el-form-item>
+          <el-form-item label="债务人税号"><el-input v-model="auditCorrectionForm.debtorTaxNo" placeholder="输入新的债务人税号" /></el-form-item>
+          <el-form-item label="回款账户"><el-input v-model="auditCorrectionForm.repaymentAccount" placeholder="输入新的回款账户" /></el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="auditCorrectionVisible = false">取消</el-button>
+          <el-button type="danger" @click="doAuditCorrection">提交审计更正</el-button>
+        </template>
+      </el-dialog>
+
     </div>
   </AppLayout>
 </template>
@@ -125,7 +167,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, RefreshRight } from '@element-plus/icons-vue'
 import AppLayout from '../components/AppLayout.vue'
 import ReceivableDetail from '../components/ReceivableDetail.vue'
-import { listReceivables, createReceivable, updateReceivable, submitReceivable } from '../api'
+import { listReceivables, createReceivable, updateReceivable, submitReceivable, submitSupplement, applyAuditCorrection } from '../api'
 import { statusMap, formatMoney, formatDate } from '../utils/constants'
 
 const loading = ref(false)
@@ -133,8 +175,12 @@ const list = ref([])
 const detailVisible = ref(false)
 const current = ref(null)
 const formVisible = ref(false)
+const supplementVisible = ref(false)
+const auditCorrectionVisible = ref(false)
 const isEdit = ref(false)
 const editId = ref(null)
+const supplementRemark = ref('')
+const auditCorrectionForm = reactive({ auditRemark: '', debtorName: '', debtorTaxNo: '', repaymentAccount: '' })
 
 const emptyForm = () => ({
   contractNo: '',
@@ -146,6 +192,7 @@ const emptyForm = () => ({
   transferAmount: 0,
   dueDate: '',
   remark: '',
+  repaymentAccount: '',
   invoices: []
 })
 const form = reactive(emptyForm())
@@ -220,9 +267,54 @@ const saveForm = async () => {
 
 const submitRow = async (row) => {
   try {
-    await ElMessageBox.confirm(`确认提交应收账款【${row.receivableNo}】至风控复核？\n\n系统将校验：所有发票必须已验真。`, '提交确认', { type: 'warning' })
+    await ElMessageBox.confirm(`确认提交应收账款【${row.receivableNo}】至风控复核？\n\n系统将校验：所有发票必须已验真，且发票未被超额转让。`, '提交确认', { type: 'warning' })
     await submitReceivable(row.id)
     ElMessage.success('已成功提交风控复核')
+    loadList()
+  } catch (e) { if (e !== 'cancel') {} }
+}
+
+const openSupplement = (row) => {
+  current.value = row
+  supplementRemark.value = row.supplementRemark || ''
+  supplementVisible.value = true
+}
+
+const doSupplement = async () => {
+  if (!supplementRemark.value.trim()) return ElMessage.warning('请填写补充材料说明')
+  try {
+    await ElMessageBox.confirm('确认提交补充材料并重新提交风控核验？', '确认提交', { type: 'warning' })
+    await submitSupplement(current.value.id, { supplementRemark: supplementRemark.value })
+    ElMessage.success('补充材料已提交，重新进入风控核验流程')
+    supplementVisible.value = false
+    loadList()
+  } catch (e) { if (e !== 'cancel') {} }
+}
+
+const openAuditCorrection = (row) => {
+  current.value = row
+  auditCorrectionForm.auditRemark = ''
+  auditCorrectionForm.debtorName = row.debtorName
+  auditCorrectionForm.debtorTaxNo = row.debtorTaxNo
+  auditCorrectionForm.repaymentAccount = row.repaymentAccount || ''
+  auditCorrectionVisible.value = true
+}
+
+const doAuditCorrection = async () => {
+  if (!auditCorrectionForm.auditRemark.trim()) return ElMessage.warning('请填写审计更正原因')
+  try {
+    await ElMessageBox.confirm('确认提交审计更正申请？\n\n修改已放款单据的关键字段需要走审计流程。', '审计更正确认', { type: 'warning', confirmButtonText: '确认申请' })
+    const payload = {
+      auditRemark: auditCorrectionForm.auditRemark,
+      receivable: {
+        debtorName: auditCorrectionForm.debtorName,
+        debtorTaxNo: auditCorrectionForm.debtorTaxNo,
+        repaymentAccount: auditCorrectionForm.repaymentAccount
+      }
+    }
+    await applyAuditCorrection(current.value.id, payload)
+    ElMessage.success('审计更正申请已提交')
+    auditCorrectionVisible.value = false
     loadList()
   } catch (e) { if (e !== 'cancel') {} }
 }

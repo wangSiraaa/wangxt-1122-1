@@ -39,10 +39,29 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="买方回执" width="130" align="center">
+        <el-table-column label="买方回执" width="140" align="center">
           <template #default="{row}">
             <el-tag v-if="row.buyerReceipt === true" type="success" effect="dark">✅ 已回执</el-tag>
             <el-tag v-else type="danger" effect="dark">❌ 未回执</el-tag>
+            <div v-if="row.buyerReceiptAmount !== null && row.buyerReceiptAmount !== undefined" style="font-size:11px;margin-top:4px;color:#374151;">回执：¥{{ formatMoney(row.buyerReceiptAmount) }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="四项校验" width="180" align="center">
+          <template #default="{row}">
+            <div style="display:flex;flex-direction:column;gap:2px;font-size:11px;text-align:left;">
+              <div :style="{color: row.invoiceVerified ? '#10b981' : '#ef4444'}">
+                {{ row.invoiceVerified ? '✅' : '❌' }} 发票已验真
+              </div>
+              <div :style="{color: row.tradeBackgroundVerified ? '#10b981' : '#ef4444'}">
+                {{ row.tradeBackgroundVerified ? '✅' : '❌' }} 贸易背景真实
+              </div>
+              <div :style="{color: (row.buyerReceiptAmount !== null && row.buyerReceiptAmount !== undefined && row.buyerReceiptAmount >= row.transferAmount) ? '#10b981' : '#ef4444'}">
+                {{ (row.buyerReceiptAmount !== null && row.buyerReceiptAmount !== undefined && row.buyerReceiptAmount >= row.transferAmount) ? '✅' : '❌' }} 回执金额充足
+              </div>
+              <div :style="{color: !row.pledged ? '#10b981' : '#ef4444'}">
+                {{ !row.pledged ? '✅' : '❌' }} 未设定质押
+              </div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="110" align="center">
@@ -75,16 +94,44 @@
 
       <ReceivableDetail v-model="detailVisible" :data="current" role="FUND" @refresh="loadList" />
 
-      <el-dialog v-model="loanVisible" title="发起放款" width="600px" destroy-on-close>
+      <el-dialog v-model="loanVisible" title="发起放款" width="640px" destroy-on-close>
+        <el-alert type="info" show-icon :closable="false" style="margin-bottom:14px;">
+          <template #title>放款前四项校验</template>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">
+            <div :style="{color: current?.invoiceVerified ? '#10b981' : '#ef4444'}">
+              {{ current?.invoiceVerified ? '✅' : '❌' }} 发票已验真
+            </div>
+            <div :style="{color: current?.tradeBackgroundVerified ? '#10b981' : '#ef4444'}">
+              {{ current?.tradeBackgroundVerified ? '✅' : '❌' }} 贸易背景真实
+            </div>
+            <div :style="{color: (current?.buyerReceiptAmount !== null && current?.buyerReceiptAmount !== undefined && current?.buyerReceiptAmount >= current?.transferAmount) ? '#10b981' : '#ef4444'}">
+              {{ (current?.buyerReceiptAmount !== null && current?.buyerReceiptAmount !== undefined && current?.buyerReceiptAmount >= current?.transferAmount) ? '✅' : '❌' }} 回执金额充足（¥{{ formatMoney(current?.buyerReceiptAmount) }} ≥ ¥{{ formatMoney(current?.transferAmount) }}）
+            </div>
+            <div :style="{color: !current?.pledged ? '#10b981' : '#ef4444'}">
+              {{ !current?.pledged ? '✅' : '❌' }} 未设定质押
+            </div>
+          </div>
+          <div v-if="current?.pledgedRemark" style="font-size:12px;color:#ef4444;margin-top:6px;">质押说明：{{ current.pledgedRemark }}</div>
+          <div v-if="current?.tradeBackgroundRemark" style="font-size:12px;color:#6b7280;margin-top:4px;">贸易背景：{{ current.tradeBackgroundRemark }}</div>
+        </el-alert>
+
         <el-descriptions :column="1" border size="small" style="margin-bottom:16px;">
           <el-descriptions-item label="应收账款编号">{{ current?.receivableNo }}</el-descriptions-item>
           <el-descriptions-item label="卖方（融资方）">{{ current?.sellerName }}</el-descriptions-item>
+          <el-descriptions-item label="债务人（买方）">{{ current?.debtorName }}</el-descriptions-item>
           <el-descriptions-item label="转让金额"><b style="color:#1d4ed8;">¥ {{ formatMoney(current?.transferAmount) }}</b></el-descriptions-item>
+          <el-descriptions-item label="回款账户">{{ current?.repaymentAccount || '<span style="color:#ef4444;">未设置</span>' }}</el-descriptions-item>
           <el-descriptions-item label="买方回执状态">
             <el-tag :type="current?.buyerReceipt ? 'success' : 'danger'" effect="dark">{{ current?.buyerReceipt ? '已确认' : '未确认' }}</el-tag>
             <span v-if="!current?.buyerReceipt" style="color:#dc2626;margin-left:8px;font-size:12px;">※ 买方未回执，系统将禁止放款</span>
           </el-descriptions-item>
         </el-descriptions>
+
+        <el-alert v-if="current?.auditCorrectionFlag" type="warning" show-icon :closable="false" style="margin-bottom:14px;">
+          <template #title>该单据存在审计更正记录</template>
+          <div style="font-size:12px;">更正说明：{{ current?.auditCorrectionRemark || '-' }}</div>
+        </el-alert>
+
         <el-form :model="loanForm" label-width="120px" label-position="right">
           <el-form-item label="放款金额" required>
             <el-input-number v-model="loanForm.loanAmount" :min="0.01" :max="current?.transferAmount || 0" :precision="2" style="width:100%;" />
@@ -150,8 +197,20 @@ const doLoan = async () => {
   if (!loanForm.loanAmount || loanForm.loanAmount <= 0) return ElMessage.warning('请填写放款金额')
   if (!loanForm.loanVoucherNo.trim()) return ElMessage.warning('请填写放款凭证号')
   if (!loanForm.loanRemark.trim()) return ElMessage.warning('请填写放款说明')
+  
+  const checkInvoice = current.value.invoiceVerified
+  const checkTrade = current.value.tradeBackgroundVerified
+  const checkReceipt = current.value.buyerReceiptAmount !== null && current.value.buyerReceiptAmount !== undefined && 
+                        current.value.buyerReceiptAmount >= current.value.transferAmount
+  const checkPledge = !current.value.pledged
+  
+  if (!checkInvoice || !checkTrade || !checkReceipt || !checkPledge) {
+    ElMessage.error(`四项校验未全部通过，请检查：\n${!checkInvoice ? '❌ 发票未验真\n' : ''}${!checkTrade ? '❌ 贸易背景未核验\n' : ''}${!checkReceipt ? '❌ 回执金额不足\n' : ''}${!checkPledge ? '❌ 应收账款已质押\n' : ''}`)
+    return
+  }
+  
   try {
-    await ElMessageBox.confirm(`确认放款¥${formatMoney(loanForm.loanAmount)}？\n\n买方回执：${current.value.buyerReceipt ? '已确认' : '未确认'}\n\n系统将校验：买方必须已回执。`, '放款确认', { type: 'warning', confirmButtonText: '确认放款' })
+    await ElMessageBox.confirm(`确认放款¥${formatMoney(loanForm.loanAmount)}？\n\n四项校验已全部通过：\n✅ 发票已验真\n✅ 贸易背景真实\n✅ 买方回执金额充足\n✅ 应收账款未质押\n\n放款后，债务人信息、发票号码、回款账户将进入审计更正流程，无法直接修改。`, '放款确认', { type: 'warning', confirmButtonText: '确认放款' })
     await grantLoan(current.value.id, loanForm)
     ElMessage.success(`放款成功，凭证号：${loanForm.loanVoucherNo}`)
     loanVisible.value = false

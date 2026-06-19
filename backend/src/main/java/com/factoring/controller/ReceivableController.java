@@ -92,7 +92,27 @@ public class ReceivableController {
 
     @PostMapping("/receivables/{id}/buyer-receipt")
     public Result<Receivable> buyerReceipt(@RequestHeader("X-Username") String username, @PathVariable Long id, @RequestBody BuyerReceiptReq req) {
-        return Result.success(receivableService.recordBuyerReceipt(username, id, req.isConfirmed(), req.getRemark()));
+        return Result.success(receivableService.recordBuyerReceipt(username, id, req.isConfirmed(), req.getReceiptAmount(), req.getRemark()));
+    }
+
+    @PostMapping("/receivables/{id}/trade-background")
+    public Result<Receivable> verifyTradeBackground(@RequestHeader("X-Username") String username, @PathVariable Long id, @RequestBody VerifyTradeBackgroundReq req) {
+        return Result.success(receivableService.verifyTradeBackground(username, id, req.isVerified(), req.getRemark()));
+    }
+
+    @PostMapping("/receivables/{id}/pledge")
+    public Result<Receivable> setPledgeStatus(@RequestHeader("X-Username") String username, @PathVariable Long id, @RequestBody SetPledgeReq req) {
+        return Result.success(receivableService.setPledgeStatus(username, id, req.isPledged(), req.getRemark()));
+    }
+
+    @PostMapping("/receivables/{id}/submit-supplement")
+    public Result<Receivable> submitSupplement(@RequestHeader("X-Username") String username, @PathVariable Long id, @RequestBody SubmitSupplementReq req) {
+        return Result.success(receivableService.submitSupplement(username, id, req.getSupplementRemark()));
+    }
+
+    @PostMapping("/receivables/{id}/audit-correction")
+    public Result<Receivable> applyAuditCorrection(@RequestHeader("X-Username") String username, @PathVariable Long id, @RequestBody AuditCorrectionReq req) {
+        return Result.success(receivableService.applyAuditCorrection(username, id, req.getAuditRemark(), req.getReceivable(), req.getInvoices()));
     }
 
     @PostMapping("/receivables/{id}/transfer-fund")
@@ -145,11 +165,50 @@ public class ReceivableController {
 
     public static class BuyerReceiptReq {
         private boolean confirmed;
+        private BigDecimal receiptAmount;
         private String remark;
         public boolean isConfirmed() { return confirmed; }
         public void setConfirmed(boolean confirmed) { this.confirmed = confirmed; }
+        public BigDecimal getReceiptAmount() { return receiptAmount; }
+        public void setReceiptAmount(BigDecimal receiptAmount) { this.receiptAmount = receiptAmount; }
         public String getRemark() { return remark; }
         public void setRemark(String remark) { this.remark = remark; }
+    }
+
+    public static class VerifyTradeBackgroundReq {
+        private boolean verified;
+        private String remark;
+        public boolean isVerified() { return verified; }
+        public void setVerified(boolean verified) { this.verified = verified; }
+        public String getRemark() { return remark; }
+        public void setRemark(String remark) { this.remark = remark; }
+    }
+
+    public static class SetPledgeReq {
+        private boolean pledged;
+        private String remark;
+        public boolean isPledged() { return pledged; }
+        public void setPledged(boolean pledged) { this.pledged = pledged; }
+        public String getRemark() { return remark; }
+        public void setRemark(String remark) { this.remark = remark; }
+    }
+
+    public static class SubmitSupplementReq {
+        private String supplementRemark;
+        public String getSupplementRemark() { return supplementRemark; }
+        public void setSupplementRemark(String supplementRemark) { this.supplementRemark = supplementRemark; }
+    }
+
+    public static class AuditCorrectionReq {
+        private String auditRemark;
+        private Receivable receivable;
+        private List<Invoice> invoices;
+        public String getAuditRemark() { return auditRemark; }
+        public void setAuditRemark(String auditRemark) { this.auditRemark = auditRemark; }
+        public Receivable getReceivable() { return receivable; }
+        public void setReceivable(Receivable receivable) { this.receivable = receivable; }
+        public List<Invoice> getInvoices() { return invoices; }
+        public void setInvoices(List<Invoice> invoices) { this.invoices = invoices; }
     }
 
     public static class LoanReq {
